@@ -1,0 +1,2 @@
+# Placeholder so the default docker-compose bind mount has a path to mount.
+# Set FUSIONOCR_PATH in .env to your real FusionOCR folder to enable real OCR.

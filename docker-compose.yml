@@ -1,0 +1,47 @@
+# FusionOCR-Tester — run once on a single host, browse to it from any device.
+#
+# The heavy bits (OCR model weights + the llava vision model) are cached in named
+# volumes, so they download ONCE per host and survive restarts/rebuilds. Other
+# devices need nothing but a browser pointed at this host.
+#
+#   1. (optional) set FUSIONOCR_PATH in a .env file to your FusionOCR folder
+#   2. docker compose up -d --build
+#   3. docker exec fusionocr-ollama ollama pull llava:7b      # one-time, for AI verify
+#   4. open http://<this-host-ip>:8200 from any device on the network
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: fusionocr-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama        # llava etc. cached here (downloads once)
+    restart: unless-stopped
+
+  tester:
+    build: .
+    container_name: fusionocr-tester
+    depends_on:
+      - ollama
+    ports:
+      - "8200:8200"
+    environment:
+      OLLAMA_BASE: "http://ollama:11434"
+      OLLAMA_VISION_MODEL: "llava:7b"
+      FUSIONOCR_PATH: "/opt/fusionocr"
+      # Point every OCR framework's model cache at the shared volume so the
+      # ~GBs of weights download once and persist:
+      HF_HOME: "/models/huggingface"
+      TORCH_HOME: "/models/torch"
+      EASYOCR_MODULE_PATH: "/models/easyocr"
+    volumes:
+      # FusionOCR source (read-only). Defaults to ./fusionocr; override with
+      # FUSIONOCR_PATH in .env. If absent, the server serves mock data.
+      - "${FUSIONOCR_PATH:-./fusionocr}:/opt/fusionocr:ro"
+      - model_cache:/models                 # OCR model weights (downloads once)
+    restart: unless-stopped
+
+volumes:
+  ollama_models:
+  model_cache:
