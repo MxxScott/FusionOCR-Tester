@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FusionOCR Tester</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --panel2:#1d212b; --line:#2a2f3a;
+    --ink:#e7ebf3; --muted:#9aa3b2; --accent:#4f8cff; --accent2:#7c5cff;
+    --ok:#34d399; --warn:#f5a623; --danger:#f87171; --chip:#222734;
+    --radius:12px; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+         font-size:14px; line-height:1.5; }
+  a { color:var(--accent); }
+  header { position:sticky; top:0; z-index:10; background:rgba(15,17,21,.85);
+           backdrop-filter:blur(8px); border-bottom:1px solid var(--line);
+           padding:14px 22px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  header h1 { font-size:17px; margin:0; font-weight:700; letter-spacing:-.01em; }
+  header .logo { width:30px; height:30px; border-radius:8px;
+                 background:linear-gradient(135deg,var(--accent),var(--accent2));
+                 display:flex; align-items:center; justify-content:center; font-size:16px; }
+  .badges { margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
+  .badge { font-size:11px; padding:4px 10px; border-radius:999px; border:1px solid var(--line);
+           background:var(--chip); color:var(--muted); display:flex; gap:6px; align-items:center; }
+  .dot { width:7px; height:7px; border-radius:50%; background:var(--muted); }
+  .dot.ok { background:var(--ok); } .dot.off { background:var(--danger); } .dot.warn{ background:var(--warn);}
+  main { max-width:1180px; margin:0 auto; padding:22px; display:grid;
+         grid-template-columns:340px 1fr; gap:22px; align-items:start; }
+  @media (max-width:880px){ main{ grid-template-columns:1fr; } }
+  .col-left { position:sticky; top:78px; }
+  @media (max-width:880px){ .col-left{ position:static; } }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); }
+  .card.pad { padding:16px; }
+  .drop { border:2px dashed var(--line); border-radius:var(--radius); padding:30px 16px;
+          text-align:center; cursor:pointer; transition:.15s; background:var(--panel); }
+  .drop.drag { border-color:var(--accent); background:rgba(79,140,255,.07); }
+  .drop .ico { font-size:30px; }
+  .drop p { margin:8px 0 2px; font-weight:600; } .drop small{ color:var(--muted); }
+  .preview { width:100%; border-radius:10px; display:block; border:1px solid var(--line); }
+  .preview-wrap { position:relative; }
+  .preview-wrap .clear { position:absolute; top:8px; right:8px; width:28px; height:28px;
+     border-radius:50%; border:none; background:rgba(0,0,0,.6); color:#fff; cursor:pointer; }
+  button { font-family:inherit; }
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px;
+         padding:11px 16px; border-radius:999px; border:1px solid var(--line);
+         background:var(--panel2); color:var(--ink); font-weight:600; font-size:14px; cursor:pointer; transition:.15s; }
+  .btn:hover { border-color:var(--accent); }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  .btn.primary { background:linear-gradient(135deg,var(--accent),var(--accent2)); border:none; color:#fff; }
+  .btn.full { width:100%; }
+  .btn.sm { padding:6px 12px; font-size:12.5px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .stats { display:flex; gap:10px; flex-wrap:wrap; margin:0 0 16px; }
+  .stat { flex:1 0 92px; background:var(--panel); border:1px solid var(--line); border-radius:10px;
+          padding:11px 14px; text-align:center; }
+  .stat b { display:block; font-size:19px; font-weight:800; } .stat span{ font-size:11px; color:var(--muted); }
+  .toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+  .seg { display:flex; background:var(--panel2); border:1px solid var(--line); border-radius:999px; padding:3px; }
+  .seg button { border:none; background:none; color:var(--muted); padding:6px 13px; border-radius:999px;
+                cursor:pointer; font-size:12.5px; font-weight:600; }
+  .seg button.on { background:var(--accent); color:#fff; }
+  .line { background:var(--panel); border:1px solid var(--line); border-radius:11px; padding:12px;
+          margin-bottom:10px; }
+  .line.flag { border-color:rgba(245,166,35,.45); background:rgba(245,166,35,.04); }
+  .line.sugg { border-color:rgba(124,92,255,.5); }
+  .line-top { display:flex; gap:10px; align-items:flex-start; }
+  .lnum { font-family:var(--mono); font-size:11px; color:var(--muted); min-width:22px; text-align:right; margin-top:11px; }
+  .ltext { flex:1; padding:9px 11px; border-radius:8px; border:1px solid var(--line);
+           background:var(--panel2); color:var(--ink); font-size:13.5px; font-family:var(--sans); outline:none; }
+  .ltext:focus { border-color:var(--accent); }
+  .conf { font-family:var(--mono); font-size:11px; min-width:38px; text-align:right; margin-top:11px; }
+  .conf.hi{ color:var(--ok);} .conf.mid{ color:var(--warn);} .conf.lo{ color:var(--danger);}
+  .iconbtn { width:30px; height:30px; border-radius:8px; border:1px solid var(--line); background:none;
+             color:var(--muted); cursor:pointer; font-size:13px; margin-top:7px; }
+  .iconbtn.on { color:var(--warn); border-color:rgba(245,166,35,.5); background:rgba(245,166,35,.12); }
+  .iconbtn:hover { border-color:var(--accent); color:var(--ink); }
+  .engines { margin:10px 0 0 32px; border-left:2px solid var(--line); padding:2px 0 2px 12px;
+             display:none; }
+  .engines.open { display:block; }
+  .eng { display:flex; gap:10px; align-items:baseline; padding:3px 0; font-size:12.5px; }
+  .eng .name { font-family:var(--mono); font-size:11px; color:var(--muted); min-width:74px; }
+  .eng .val { flex:1; } .eng.diff .val{ color:var(--warn); }
+  .eng.match .name::after { content:" ✓"; color:var(--ok); }
+  .togglerow { margin:8px 0 0 32px; }
+  .link { background:none; border:none; color:var(--accent); cursor:pointer; font-size:12px; padding:0; }
+  .sugg-box { margin:10px 0 0 32px; padding:10px 12px; border-radius:9px;
+              background:rgba(124,92,255,.08); border:1px solid rgba(124,92,255,.3); }
+  .sugg-box .label { font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+                     color:var(--accent2); margin-bottom:5px; }
+  .sugg-box .diff { font-size:13px; } .sugg-box .old{ color:var(--danger); text-decoration:line-through; }
+  .sugg-box .new{ color:var(--ok); } .sugg-box .meta{ font-size:11px; color:var(--muted); margin-top:4px; }
+  .sugg-actions { display:flex; gap:8px; margin-top:9px; }
+  .empty { text-align:center; color:var(--muted); padding:60px 20px; }
+  .spinner { width:38px; height:38px; border:4px solid var(--line); border-top-color:var(--accent);
+             border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 14px; }
+  @keyframes spin { to{ transform:rotate(360deg);} }
+  .hint { font-size:12px; color:var(--muted); margin-top:10px; }
+  .progress { height:5px; border-radius:999px; background:var(--line); overflow:hidden; margin-top:14px; }
+  .progress > i { display:block; height:100%; width:0; background:linear-gradient(90deg,var(--accent),var(--accent2)); transition:width .4s; }
+  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--panel2);
+           border:1px solid var(--line); padding:10px 16px; border-radius:10px; font-size:13px; opacity:0;
+           pointer-events:none; transition:.2s; z-index:50; }
+  .toast.show { opacity:1; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">🔬</div>
+  <h1>FusionOCR&nbsp;Tester</h1>
+  <div class="badges">
+    <span class="badge" id="b-mode"><span class="dot"></span> OCR: …</span>
+    <span class="badge" id="b-ai"><span class="dot"></span> AI verify: …</span>
+  </div>
+</header>
+
+<main>
+  <!-- LEFT: image + actions -->
+  <div class="col-left">
+    <div id="dropZone" class="drop">
+      <div class="ico">🖼️</div>
+      <p>Drop a script image</p>
+      <small>or click to browse · JPG, PNG, WEBP</small>
+      <input id="fileInput" type="file" accept="image/*" hidden />
+    </div>
+    <div id="previewWrap" class="preview-wrap" style="display:none; margin-top:12px;">
+      <img id="preview" class="preview" alt="script" />
+      <button id="clearImg" class="clear" title="Remove">✕</button>
+    </div>
+    <button id="runBtn" class="btn primary full" style="margin-top:14px;" disabled>Run FusionOCR 🔬</button>
+    <div id="ocrProgress" class="progress" style="display:none;"><i></i></div>
+    <p class="hint">FusionOCR runs on the server. If it isn't installed, the app
+       serves realistic mock data so you can still try the workflow.</p>
+  </div>
+
+  <!-- RIGHT: results -->
+  <div class="col-right">
+    <div id="results"></div>
+  </div>
+</main>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const $ = (s, r=document) => r.querySelector(s);
+const API = ""; // same origin
+
+let imageFile = null;
+let result = null;                // { lines:[...], engines_used, overall_confidence, mode, ... }
+let suggestions = {};             // line number -> suggestion object
+let verifyMode = "flagged";       // 'flagged' | 'all'
+const openEngines = new Set();    // line numbers whose engine breakdown is expanded
+
+/* ---------- helpers ---------- */
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),1900); }
+function escapeHtml(s){ return (s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function confClass(c){ return c>=0.75?"hi":c>=0.65?"mid":"lo"; }
+
+/* ---------- health ---------- */
+async function loadHealth(){
+  try {
+    const h = await (await fetch(API+"/api/health")).json();
+    const bm=$("#b-mode"), ba=$("#b-ai");
+    if (h.fusionocr_present){ bm.innerHTML='<span class="dot ok"></span> OCR: FusionOCR'; }
+    else { bm.innerHTML='<span class="dot warn"></span> OCR: mock data'; bm.title=h.fusionocr_path; }
+    if (h.ollama_available){ ba.innerHTML='<span class="dot ok"></span> AI verify: '+escapeHtml(h.vision_model); }
+    else { ba.innerHTML='<span class="dot warn"></span> AI verify: engine vote'; ba.title="Ollama not running — falling back to per-engine majority vote"; }
+  } catch(e){
+    $("#b-mode").innerHTML='<span class="dot off"></span> server offline';
+  }
+}
+
+/* ---------- file handling ---------- */
+function setFile(f){
+  if (!f){ imageFile=null; $("#previewWrap").style.display="none"; $("#runBtn").disabled=true; return; }
+  imageFile=f;
+  $("#preview").src=URL.createObjectURL(f);
+  $("#previewWrap").style.display="block";
+  $("#runBtn").disabled=false;
+}
+const dz=$("#dropZone");
+dz.addEventListener("click",()=>$("#fileInput").click());
+$("#fileInput").addEventListener("change",e=>setFile(e.target.files[0]));
+dz.addEventListener("dragover",e=>{e.preventDefault();dz.classList.add("drag");});
+dz.addEventListener("dragleave",()=>dz.classList.remove("drag"));
+dz.addEventListener("drop",e=>{e.preventDefault();dz.classList.remove("drag");setFile(e.dataTransfer.files[0]);});
+$("#clearImg").addEventListener("click",()=>{ setFile(null); $("#fileInput").value=""; });
+
+/* ---------- run OCR ---------- */
+$("#runBtn").addEventListener("click", runOCR);
+async function runOCR(){
+  if (!imageFile) return;
+  suggestions={}; openEngines.clear();
+  $("#results").innerHTML = `<div class="card pad"><div class="spinner"></div>
+     <p style="text-align:center;color:var(--muted)">Transcribing with FusionOCR…</p></div>`;
+  const pr=$("#ocrProgress"); pr.style.display="block"; pr.firstElementChild.style.width="35%";
+  try {
+    const form=new FormData(); form.append("image", imageFile);
+    const res=await fetch(API+"/api/ocr",{method:"POST",body:form});
+    pr.firstElementChild.style.width="90%";
+    if(!res.ok) throw new Error("OCR error "+res.status);
+    result=await res.json();
+    pr.firstElementChild.style.width="100%";
+    render();
+    setTimeout(()=>{pr.style.display="none";pr.firstElementChild.style.width="0";},400);
+  } catch(e){
+    $("#results").innerHTML=`<div class="card pad" style="color:var(--danger)">${escapeHtml(e.message)}</div>`;
+    pr.style.display="none";
+  }
+}
+
+/* ---------- AI verification ---------- */
+async function runVerify(){
+  if(!result) return;
+  const btn=$("#verifyBtn"); btn.disabled=true; btn.textContent="Verifying…";
+  try {
+    const form=new FormData();
+    form.append("payload", JSON.stringify({ lines:result.lines, mode:verifyMode }));
+    if (imageFile) form.append("image", imageFile);
+    const res=await fetch(API+"/api/verify",{method:"POST",body:form});
+    if(!res.ok) throw new Error("Verify error "+res.status);
+    const data=await res.json();
+    suggestions={};
+    data.suggestions.forEach(s=>{ suggestions[s.line]=s; });
+    render();
+    const n=data.suggestions.length;
+    toast(n? `${n} suggestion${n>1?"s":""} from ${data.method==="vision"?"AI vision":"engine vote"}`
+            : `No changes suggested (${data.method==="vision"?"AI vision":"engine vote"})`);
+  } catch(e){ toast(e.message); }
+  finally { btn.disabled=false; btn.textContent="Run AI verification ✨"; }
+}
+
+function applySuggestion(line){
+  const s=suggestions[line]; if(!s) return;
+  const L=result.lines.find(l=>l.line===line);
+  if(L){ L.text=s.corrected_text; L.flagged=false; }
+  delete suggestions[line]; render();
+}
+function rejectSuggestion(line){ delete suggestions[line]; render(); }
+function acceptAll(){
+  Object.values(suggestions).forEach(s=>{
+    const L=result.lines.find(l=>l.line===s.line);
+    if(L){ L.text=s.corrected_text; L.flagged=false; }
+  });
+  suggestions={}; render(); toast("All suggestions applied");
+}
+
+/* ---------- line editing ---------- */
+function updateText(line,val){ const L=result.lines.find(l=>l.line===line); if(L)L.text=val;
+  $("#full-text") && ($("#full-text").textContent=fullText()); }
+function toggleFlag(line){ const L=result.lines.find(l=>l.line===line); if(L)L.flagged=!L.flagged; render(); }
+function deleteLine(line){ result.lines=result.lines.filter(l=>l.line!==line)
+  .map((l,i)=>({...l,line:i+1})); delete suggestions[line]; render(); }
+function addLine(){ const n=result.lines.length+1;
+  result.lines.push({line:n,text:"",confidence:1,flagged:false,engines:{}}); render(); }
+function toggleEngines(line){ openEngines.has(line)?openEngines.delete(line):openEngines.add(line); render(); }
+
+/* ---------- export ---------- */
+function fullText(){ return result.lines.map(l=>l.text).join("\n"); }
+function exportJSON(){
+  const out={ source:result.source, engines_used:result.engines_used,
+    overall_confidence:result.overall_confidence,
+    full_text:fullText(),
+    lines:result.lines.map(l=>({line:l.line,text:l.text,confidence:l.confidence,flagged:l.flagged})),
+    verified_at:new Date().toISOString() };
+  const blob=new Blob([JSON.stringify(out,null,2)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download=(result.source||"transcription").replace(/\.[^.]+$/,"")+"_verified.json"; a.click();
+  toast("Exported corrected JSON");
+}
+function copyText(){ navigator.clipboard.writeText(fullText()); toast("Transcription copied"); }
+
+/* ---------- render ---------- */
+function render(){
+  if(!result){ return; }
+  const lines=result.lines;
+  const flagged=lines.filter(l=>l.flagged).length;
+  const avg=lines.length? Math.round(lines.reduce((a,l)=>a+l.confidence,0)/lines.length*100):0;
+  const nSugg=Object.keys(suggestions).length;
+
+  let html=`
+    <div class="stats">
+      <div class="stat"><b>${lines.length}</b><span>lines</span></div>
+      <div class="stat"><b style="color:${flagged?'var(--warn)':'var(--ok)'}">${flagged}</b><span>flagged</span></div>
+      <div class="stat"><b style="color:${avg>=75?'var(--ok)':avg>=65?'var(--warn)':'var(--danger)'}">${avg}%</b><span>avg conf.</span></div>
+      <div class="stat"><b>${result.engines_used.length}</b><span>engines</span></div>
+    </div>
+    <div class="toolbar">
+      <span class="seg">
+        <button class="${verifyMode==='flagged'?'on':''}" onclick="verifyMode='flagged';render()">Flagged only</button>
+        <button class="${verifyMode==='all'?'on':''}" onclick="verifyMode='all';render()">All lines</button>
+      </span>
+      <button id="verifyBtn" class="btn sm" onclick="runVerify()">Run AI verification ✨</button>
+      ${nSugg?`<button class="btn sm" onclick="acceptAll()">Accept all (${nSugg})</button>`:""}
+      <span style="flex:1"></span>
+      <button class="btn sm" onclick="copyText()">Copy text</button>
+      <button class="btn sm" onclick="exportJSON()">Export JSON ↓</button>
+    </div>
+    <p class="hint" style="margin:-4px 0 12px">Edit any line, flag/unflag uncertain ones, then run AI verification.
+       Expand a line to compare what each OCR engine read.</p>
+  `;
+
+  for(const l of lines){
+    const eng=l.engines||{};
+    const engKeys=Object.keys(eng);
+    const isOpen=openEngines.has(l.line);
+    const s=suggestions[l.line];
+    html+=`
+    <div class="line ${l.flagged?'flag':''} ${s?'sugg':''}">
+      <div class="line-top">
+        <span class="lnum">${l.line}</span>
+        <input class="ltext" value="${escapeHtml(l.text)}" oninput="updateText(${l.line}, this.value)"
+               placeholder="(empty line)"/>
+        <span class="conf ${confClass(l.confidence)}">${Math.round(l.confidence*100)}%</span>
+        <button class="iconbtn ${l.flagged?'on':''}" title="Flag uncertain" onclick="toggleFlag(${l.line})">⚑</button>
+        <button class="iconbtn" title="Delete line" onclick="deleteLine(${l.line})">✕</button>
+      </div>`;
+    if(engKeys.length){
+      html+=`<div class="togglerow"><button class="link" onclick="toggleEngines(${l.line})">
+              ${isOpen?'▾ hide':'▸ compare'} engines (${engKeys.length})</button></div>`;
+      html+=`<div class="engines ${isOpen?'open':''}">`;
+      for(const k of result.engines_used.concat(engKeys.filter(k=>!result.engines_used.includes(k)))){
+        if(!(k in eng)) continue;
+        const same=(eng[k]||"").trim().toLowerCase()===(l.text||"").trim().toLowerCase();
+        html+=`<div class="eng ${same?'match':'diff'}"><span class="name">${escapeHtml(k)}</span>
+                <span class="val">${escapeHtml(eng[k]||"—")}</span></div>`;
+      }
+      html+=`</div>`;
+    }
+    if(s){
+      html+=`<div class="sugg-box">
+        <div class="label">${s.method==='vision'?'AI vision suggestion':'Engine-vote suggestion'} · ${escapeHtml(s.confidence)}</div>
+        <div class="diff"><span class="old">${escapeHtml(s.original_text)}</span> &nbsp;→&nbsp; <span class="new">${escapeHtml(s.corrected_text)}</span></div>
+        ${s.issues&&s.issues!=='none'?`<div class="meta">${escapeHtml(s.issues)}</div>`:""}
+        <div class="sugg-actions">
+          <button class="btn sm primary" onclick="applySuggestion(${l.line})">Accept</button>
+          <button class="btn sm" onclick="rejectSuggestion(${l.line})">Reject</button>
+        </div>
+      </div>`;
+    }
+    html+=`</div>`;
+  }
+
+  html+=`<button class="btn full" style="border-style:dashed" onclick="addLine()">+ Add line</button>`;
+  $("#results").innerHTML=html;
+}
+
+/* ---------- init ---------- */
+$("#results").innerHTML=`<div class="empty card pad">
+   <div style="font-size:34px">📄</div>
+   <p>Upload a handwritten script image and run FusionOCR to begin.</p></div>`;
+loadHealth();
+</script>
+</body>
+</html>
