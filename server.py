@@ -32,7 +32,7 @@ from typing import Optional
 
 import requests
 from fastapi import FastAPI, UploadFile, File, Form
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 logging.basicConfig(level=logging.INFO)
@@ -44,7 +44,7 @@ OLLAMA_BASE     = os.getenv("OLLAMA_BASE", "http://localhost:11434")
 OLLAMA_VISION   = os.getenv("OLLAMA_VISION_MODEL", "llava:7b")
 
 # Engine ids FusionOCR fuses together (used for the per-engine comparison UI).
-ENGINES = ["trocr_hw", "trocr_pr", "easyocr", "tesseract"]
+ENGINES = ["trocr_handwritten", "trocr_printed", "easyocr", "tesseract"]
 
 app = FastAPI(title="FusionOCR Tester", version="1.0.0")
 app.add_middleware(
@@ -61,8 +61,8 @@ MOCK_LINES = [
         "line": 1, "text": "Plants need sunlight water and nutrients to grow.",
         "confidence": 0.91, "flagged": False,
         "engines": {
-            "trocr_hw": "Plants need sunlight water and nutrients to grow.",
-            "trocr_pr": "Plants need sunlight water and nutrients to grow.",
+            "trocr_handwritten": "Plants need sunlight water and nutrients to grow.",
+            "trocr_printed": "Plants need sunlight water and nutrients to grow.",
             "easyocr":  "Plants need sunlight water and nutrients to grow.",
             "tesseract":"Plants need sunlight water and nutrlents to grow.",
         },
@@ -71,8 +71,8 @@ MOCK_LINES = [
         "line": 2, "text": "Photosynthsis is when plants make food from sunlight.",
         "confidence": 0.74, "flagged": False,
         "engines": {
-            "trocr_hw": "Photosynthsis is when plants make food from sunlight.",
-            "trocr_pr": "Photosynthesis is when plants make food from sunlight.",
+            "trocr_handwritten": "Photosynthsis is when plants make food from sunlight.",
+            "trocr_printed": "Photosynthesis is when plants make food from sunlight.",
             "easyocr":  "Photosynthsis is when plants make food from sunlight.",
             "tesseract":"Photosynthsis is when plonts make food from sunlight.",
         },
@@ -81,8 +81,8 @@ MOCK_LINES = [
         "line": 3, "text": "They use carbon dioxid and warter to make glucose.",
         "confidence": 0.61, "flagged": True,
         "engines": {
-            "trocr_hw": "They use carbon dioxid and warter to make glucose.",
-            "trocr_pr": "They use carbon dioxide and water to make glucose.",
+            "trocr_handwritten": "They use carbon dioxid and warter to make glucose.",
+            "trocr_printed": "They use carbon dioxide and water to make glucose.",
             "easyocr":  "They use carbon dioxid and warter to make glucoze.",
             "tesseract":"They use corbon dioxid and worter to moke glucose.",
         },
@@ -91,8 +91,8 @@ MOCK_LINES = [
         "line": 4, "text": "Oxygen is relesed as a biproduct.",
         "confidence": 0.68, "flagged": True,
         "engines": {
-            "trocr_hw": "Oxygen is relesed as a biproduct.",
-            "trocr_pr": "Oxygen is released as a by-product.",
+            "trocr_handwritten": "Oxygen is relesed as a biproduct.",
+            "trocr_printed": "Oxygen is released as a by-product.",
             "easyocr":  "Oxygen is relesed as a biproduct.",
             "tesseract":"Oxygen is relesed as a blproduct.",
         },
@@ -101,8 +101,8 @@ MOCK_LINES = [
         "line": 5, "text": "The green pigment in leaves is called chlorophyll.",
         "confidence": 0.88, "flagged": False,
         "engines": {
-            "trocr_hw": "The green pigment in leaves is called chlorophyll.",
-            "trocr_pr": "The green pigment in leaves is called chlorophyll.",
+            "trocr_handwritten": "The green pigment in leaves is called chlorophyll.",
+            "trocr_printed": "The green pigment in leaves is called chlorophyll.",
             "easyocr":  "The green pigment in leaves is called chlorophyll.",
             "tesseract":"The green pigment in leaves is called chlorophy11.",
         },
@@ -111,8 +111,8 @@ MOCK_LINES = [
         "line": 6, "text": "It absorbs red and blue lite but reflects green.",
         "confidence": 0.72, "flagged": False,
         "engines": {
-            "trocr_hw": "It absorbs red and blue lite but reflects green.",
-            "trocr_pr": "It absorbs red and blue light but reflects green.",
+            "trocr_handwritten": "It absorbs red and blue lite but reflects green.",
+            "trocr_printed": "It absorbs red and blue light but reflects green.",
             "easyocr":  "It absorbs red and blue lite but reflects green.",
             "tesseract":"It absorbs red and blue lite but reflects green.",
         },
@@ -121,8 +121,8 @@ MOCK_LINES = [
         "line": 7, "text": "Without enough light plants cannot photosinthesize well.",
         "confidence": 0.83, "flagged": False,
         "engines": {
-            "trocr_hw": "Without enough light plants cannot photosinthesize well.",
-            "trocr_pr": "Without enough light plants cannot photosynthesize well.",
+            "trocr_handwritten": "Without enough light plants cannot photosinthesize well.",
+            "trocr_printed": "Without enough light plants cannot photosynthesize well.",
             "easyocr":  "Without enough light plants cannot photosinthesize well.",
             "tesseract":"Without enough light plants connot photosinthesize well.",
         },
@@ -131,8 +131,8 @@ MOCK_LINES = [
         "line": 8, "text": "Plants also need minerals from the soil like nitragen.",
         "confidence": 0.65, "flagged": True,
         "engines": {
-            "trocr_hw": "Plants also need minerals from the soil like nitragen.",
-            "trocr_pr": "Plants also need minerals from the soil like nitrogen.",
+            "trocr_handwritten": "Plants also need minerals from the soil like nitragen.",
+            "trocr_printed": "Plants also need minerals from the soil like nitrogen.",
             "easyocr":  "Plants also need minerals from the soil like nitragen.",
             "tesseract":"Plonts also need minerals from the soil like nitragen.",
         },
@@ -172,7 +172,10 @@ def _run_fusionocr(image_path: str) -> Optional[dict]:
 def _normalize(raw: dict, source: str) -> dict:
     """Coerce a FusionOCR result into the UI contract, tolerating shape varis."""
     lines_in = raw.get("lines", [])
-    flagged_set = {r.get("line") for r in raw.get("flagged_lines", [])}
+    # flagged_lines may be a list of ints or of {"line": n} dicts — tolerate both
+    flagged_set = set()
+    for r in raw.get("flagged_lines", []):
+        flagged_set.add(r.get("line") if isinstance(r, dict) else r)
 
     lines = []
     for i, l in enumerate(lines_in, start=1):
@@ -388,5 +391,5 @@ def index() -> FileResponse:
 
 
 @app.get("/favicon.ico")
-def favicon() -> JSONResponse:
-    return JSONResponse({}, status_code=204)
+def favicon() -> Response:
+    return Response(status_code=204)

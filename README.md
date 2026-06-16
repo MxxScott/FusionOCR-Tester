@@ -23,9 +23,6 @@ uvicorn server:app --reload --port 8200
 
 ## Run once, use from any device (Docker — recommended)
 
-This is the answer to "I don't want the 6GB of OCR models on every device." Run the stack on
-**one** machine; the model weights download once into Docker volumes and persist. Every other
-device just browses to it.
 
 ```bash
 # 1. (optional) tell it where FusionOCR lives — enables real OCR
